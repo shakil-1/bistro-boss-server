@@ -1,26 +1,21 @@
 const express = require('express');
+const app = express()
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
-const app = express()
 require('dotenv').config()
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const port = process.env.PORT || 5000;
 
 
 
-const corsOptions = {
-  origin: 'http://localhost:5173',
-  // methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-  credentials: true,
-  // optionsSuccessStatus: 204,
-};
-app.use(cors(corsOptions));
-
-// middleware
-app.use(express.json())
-
-
-console.log(process.env.DB_PASS);
+// const corsOptions = {
+//   origin: 'http://localhost:5173',
+//   // methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+//   credentials: true,
+//   // optionsSuccessStatus: 204,
+// };
+app.use(cors());
+app.use(express.json());
 
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.vte07fo.mongodb.net/?retryWrites=true&w=majority`;
@@ -92,7 +87,6 @@ app.get('/users/admin/:email', verifyToken, async (req, res) => {
     admin = user?.role === 'admin'
   }
   res.send({ admin });
-
 })
 
 app.post('/users', async (req, res) => {
@@ -137,9 +131,16 @@ app.get('/menu', async (req, res) => {
   res.send(result)
 })
 
-app.post('/menu', verifyToken, verifyAdmin, async (req, res) => {
+app.post('/menu',verifyToken, verifyAdmin, async (req, res) => {
   const item = req.body;
   const result = await menuCollection.insertOne(item)
+  res.send(result)
+})
+
+app.delete('/menu/:id', async(req,res) =>{
+  const id = req.params.id
+  const query = {_id:new ObjectId(id)}
+  const result = await menuCollection.deleteOne(query)
   res.send(result)
 })
 
