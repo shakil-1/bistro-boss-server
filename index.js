@@ -34,6 +34,7 @@ const menuCollection = client.db('bistroDB').collection('menu')
 const reviewsCollection = client.db('bistroDB').collection('reviews')
 const cartCollection = client.db('bistroDB').collection('carts')
 const userCollection = client.db('bistroDB').collection('users')
+const paymentCollection = client.db('bistroDB').collection('payments')
 
 // jwt related api 
 app.post('/jwt', async (req, res) => {
@@ -203,24 +204,140 @@ app.delete('/carts/:id', async (req, res) => {
 
 
 //payment intent 
-app.post('/create-payment-intent', async(req, res) =>{
-  const {price} = req.body;
+app.post('/create-payment-intent', async (req, res) => {
+  const { price } = req.body;
 
   const amount = parseInt(price * 100)
-console.log(amount);
+  console.log(amount);
 
   const paymentIntent = await stripe.paymentIntents.create({
-    amount:amount,
-    currency:'usd',
-    payment_method_types:['card']
+    amount: amount,
+    currency: 'usd',
+    payment_method_types: ['card']
 
   })
- 
+
   res.send({
-    clientSecret:paymentIntent.client_secret
+    clientSecret: paymentIntent.client_secret
   })
- 
+
 })
+
+
+
+// app.get('/payments', async(req, res) =>{
+
+//   const query = {email: req.params.email}
+//   if(req.params.email !== req.params.email){
+//     return res.status(403).send({message: 'forbidden access'})
+//   }
+//   const result = await paymentCollection.find(query).toArray()
+//   res.send(result)
+// })
+
+app.get('/payments', verifyToken, async (req, res) => {
+  const query = { email: req.query.email };
+  if (req.params.email !== req.params.email) {
+    return res.status(403).send({ message: 'forbidden access' })
+  }
+  const result = await paymentCollection.find(query).toArray()
+  res.send(result)
+})
+
+
+// payment related api 
+app.post('/payments', async (req, res) => {
+  const payment = req.body;
+  const paymentResult = await paymentCollection.insertOne(payment)
+
+  // carefully delete eact item from the cart
+  console.log('payment ingor ', payment);
+  const query = {
+    _id: {
+      $in: payment.cartIds.map(id => new ObjectId(id))
+    }
+  }
+  const deleterResult = await cartCollection.deleteMany(query)
+  res.send({ paymentResult, deleterResult })
+
+})
+
+//stats or analytics
+
+app.get('/admin-stats', verifyToken, verifyAdmin, async (req, res) => {
+  const users = await userCollection.estimatedDocumentCount();
+  const menuItems = await menuCollection.estimatedDocumentCount();
+  const orders = await paymentCollection.estimatedDocumentCount();
+
+  // this is not the best way 
+  // const payments = await paymentCollection.find().toArray()
+  // const revenue = payments.reduce((total, payment)=>total + payment.price,0)
+  const result = await paymentCollection.aggregate([
+    {
+      $group: {
+        _id: null,
+        totalRevenue: {
+          $sum: '$price'
+        }
+      }
+    }
+  ]).toArray()
+  const revenue = result.length > 0 ? result[0].totalRevenue : 0;
+
+  res.send({
+    users,
+    menuItems,
+    orders,
+    revenue
+  })
+})
+
+// oreder status
+/**
+ * ------
+ * NON-EFFICIENT WAY
+ * ----------
+ * 1. lodad all the payments
+ * 2. for every  menuItemIds (which is an array ), go find th item menu collection
+ * 3. for every item in the menu collection that you found from  a payment entry (document)
+ */
+
+// usering aggregate pipline 
+app.get('/order-stats',  async (req, res) => {
+  const result = await paymentCollection.aggregate([
+    { $unwind: '$menuItemIds' },
+     {
+      $lookup: {
+        from: 'menu',
+        localField: 'menuItemIds',
+        foreignField: '_id',
+        as: 'menuItems'
+      }
+    }
+  ]).toArray();
+  
+  res.send(result);
+  console.log(result);
+  
+})
+
+
+// {
+//   $lookup: {
+//     from: 'menu',
+//     localField: 'menuItemIds',
+//     foreignField: '_id',
+//     as: 'menuItems'
+//   }
+// },
+// { $unwind: '$menuItems' },
+// {
+//   $group: {
+//     _id: '$menuItems.category',
+//     quantity: { $sum: 1 },
+//     revenue: { $sum: '$menuItems.price' }
+//   }
+// }
 
 async function run() {
   try {
@@ -245,6 +362,7 @@ app.get('/', (req, res) => {
 app.listen(port, () => {
   console.log(`bisto servier running ${port}`);
 })
+
 
 /**
  * ---------------------------
