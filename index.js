@@ -224,17 +224,6 @@ app.post('/create-payment-intent', async (req, res) => {
 })
 
 
-
-// app.get('/payments', async(req, res) =>{
-
-//   const query = {email: req.params.email}
-//   if(req.params.email !== req.params.email){
-//     return res.status(403).send({message: 'forbidden access'})
-//   }
-//   const result = await paymentCollection.find(query).toArray()
-//   res.send(result)
-// })
-
 app.get('/payments', verifyToken, async (req, res) => {
   const query = { email: req.query.email };
   if (req.params.email !== req.params.email) {
@@ -246,8 +235,10 @@ app.get('/payments', verifyToken, async (req, res) => {
 
 
 // payment related api 
-app.post('/payments', async (req, res) => {
+app.post('/payments',verifyToken, async (req, res) => {
   const payment = req.body;
+
+  console.log(payment);
   const paymentResult = await paymentCollection.insertOne(payment)
 
   // carefully delete eact item from the cart
@@ -292,6 +283,7 @@ app.get('/admin-stats', verifyToken, verifyAdmin, async (req, res) => {
   })
 })
 
+// payment._id = payment._id.map(id => new ObjectId(id));
 // oreder status
 /**
  * ------
@@ -302,43 +294,45 @@ app.get('/admin-stats', verifyToken, verifyAdmin, async (req, res) => {
  * 3. for every item in the menu collection that you found from  a payment entry (document)
  */
 
+
+
 // usering aggregate pipline 
-app.get('/order-stats',  async (req, res) => {
+app.get('/order-stats', verifyToken, verifyAdmin,  async (req, res) => {
   const result = await paymentCollection.aggregate([
+
     { $unwind: '$menuItemIds' },
-     {
+    { "$project": { "menuItemId": { "$toObjectId": "$menuItemIds" } } },
+    {
       $lookup: {
         from: 'menu',
-        localField: 'menuItemIds',
+        localField: 'menuItemId',
         foreignField: '_id',
         as: 'menuItems'
       }
+    },
+
+    { $unwind: '$menuItems' },
+
+    {
+      $group: {
+        _id: '$menuItems.category',
+        quantity: { $sum: 1 },
+        revenue: { $sum: '$menuItems.price' }
+      }
+    },
+    {
+      $project: {
+        _id: 0,
+        category: '$_id',
+        quantity: '$quantity',
+        revenue: '$revenue'
+      }
     }
   ]).toArray();
-  
+
   res.send(result);
-  console.log(result);
   
 })
-
-
-// {
-//   $lookup: {
-//     from: 'menu',
-//     localField: 'menuItemIds',
-//     foreignField: '_id',
-//     as: 'menuItems'
-//   }
-// },
-// { $unwind: '$menuItems' },
-// {
-//   $group: {
-//     _id: '$menuItems.category',
-//     quantity: { $sum: 1 },
-//     revenue: { $sum: '$menuItems.price' }
-//   }
-// }
-
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
