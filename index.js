@@ -9,13 +9,13 @@ const port = process.env.PORT || 5000;
 
 
 
-// const corsOptions = {
-//   origin: 'http://localhost:5173',
-//   // methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-//   credentials: true,
-//   // optionsSuccessStatus: 204,
-// };
-app.use(cors());
+const corsOptions = {
+  origin: 'http://localhost:5173',
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  credentials: true,
+  
+};
+app.use(cors(corsOptions));
 app.use(express.json());
 
 
@@ -38,15 +38,19 @@ const paymentCollection = client.db('bistroDB').collection('payments')
 
 // jwt related api 
 app.post('/jwt', async (req, res) => {
-  const user = req.body;
-  const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
-  res.send({ token })
+  try {
+    const user = req.body;
+    const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
+    res.send({ token })
+  } catch (err) {
+    console.log(err);
+  }
 })
 
 
 // middelwares
 const verifyToken = (req, res, next) => {
-  console.log('inseide verify token', req.headers.authorization);
+ try{
   if (!req.headers.authorization) {
     return res.status(401).send({ message: 'unauthorized access' })
   }
@@ -58,10 +62,14 @@ const verifyToken = (req, res, next) => {
     req.decoded = decoded;
     next();
   })
+ }catch (err) {
+  console.log(err);
+}
 }
 
 // use verify admin after verifyToken 
 const verifyAdmin = async (req, res, next) => {
+ try{
   const email = req.decoded.email;
   const query = { email: email }
   const user = await userCollection.findOne(query)
@@ -70,14 +78,24 @@ const verifyAdmin = async (req, res, next) => {
     return res.status(403).send({ message: 'forbdden access' })
   }
   next();
+ }catch(err){
+  console.log(err);
+ }
 }
 
 // user related api 
 app.get('/users', verifyToken, verifyAdmin, async (req, res) => {
+ try{
   const result = await userCollection.find().toArray()
   res.send(result)
+ }catch(err){
+  console.log(err);
+ }
 })
+
+
 app.get('/users/admin/:email', verifyToken, async (req, res) => {
+ try{
   const email = req.params.email;
   if (email !== req.decoded.email) {
     return res.status(403).send({ message: 'forbidden access' })
@@ -89,10 +107,14 @@ app.get('/users/admin/:email', verifyToken, async (req, res) => {
     admin = user?.role === 'admin'
   }
   res.send({ admin });
+ }catch(err){
+  console.log(err);
+ }
 })
 
 app.post('/users', async (req, res) => {
-  const user = req.body;
+  try{
+    const user = req.body;
   // inser email if user doesnt exists;
   // you con do this many was (1. email unique , 2 . upsert3. simple checking)
 
@@ -103,9 +125,13 @@ app.post('/users', async (req, res) => {
   }
   const result = await userCollection.insertOne(user)
   res.send(result)
+  }catch(err){
+    console.log(err);
+   }
 })
 
 app.patch('/users/admin/:id', verifyToken, verifyAdmin, async (req, res) => {
+ try{
   const id = req.params.id;
   const filter = { _id: new ObjectId(id) }
   const updatedDoc = {
@@ -116,45 +142,69 @@ app.patch('/users/admin/:id', verifyToken, verifyAdmin, async (req, res) => {
   const result = await userCollection.updateOne(filter, updatedDoc)
   res.send(result)
 
+ }catch(err){
+  console.log(err);
+ }
 })
 
 app.delete('/users/:id', verifyToken, verifyAdmin, async (req, res) => {
-  const id = req.params.id;
+  try{
+    const id = req.params.id;
   const query = { _id: new ObjectId(id) }
   const result = await userCollection.deleteOne(query)
   res.send(result)
+  }catch(err){
+    console.log(err);
+   }
 })
 
 
 
 // menu related api 
 app.get('/menu', async (req, res) => {
+ try{
   const result = await menuCollection.find().toArray()
   res.send(result)
+ }catch(err){
+  console.log(err);
+ }
 })
 
 app.post('/menu', verifyToken, verifyAdmin, async (req, res) => {
+ try{
   const item = req.body;
   const result = await menuCollection.insertOne(item)
   res.send(result)
+ }catch(err){
+  console.log(err);
+ }
 })
 
 app.delete('/menu/:id', verifyToken, verifyAdmin, async (req, res) => {
-  const id = req.params.id
+  try{
+    const id = req.params.id
   const query = { _id: new ObjectId(id) }
   const result = await menuCollection.deleteOne(query)
   res.send(result)
+  }catch(err){
+    console.log(err);
+   }
 })
 
 app.get('/menu/:id', async (req, res) => {
-  const id = req.params.id
+  try{
+    const id = req.params.id
   const query = { _id: new ObjectId(id) }
   const result = await menuCollection.findOne(query)
   res.send(result)
+  }catch(err){
+    console.log(err);
+   }
 })
 
 app.patch('/menu/:id', async (req, res) => {
-  const item = req.body;
+  try{
+    const item = req.body;
   const id = req.params.id;
   const filter = { _id: new ObjectId(id) }
   const updatedDoc = {
@@ -168,47 +218,65 @@ app.patch('/menu/:id', async (req, res) => {
   }
   const result = await menuCollection.updateOne(filter, updatedDoc)
   res.send(result)
+  }catch(err){
+    console.log(err);
+   }
 })
 
 // review related api 
 app.get('/review', async (req, res) => {
+ try{
   const result = await reviewsCollection.find().toArray()
   res.send(result)
+ }catch(err){
+  console.log(err);
+ }
 })
 
 
 
 // carts collection 
 app.get('/carts', async (req, res) => {
-  const email = req.query.email;
+  try{
+    const email = req.query.email;
   const query = { email: email }
   const result = await cartCollection.find(query).toArray()
   res.send(result)
+  }catch(err){
+    console.log(err);
+   }
 })
 
 
 
 app.post('/carts', async (req, res) => {
+ try{
   const cartItem = req.body;
   const result = await cartCollection.insertOne(cartItem)
   res.send(result)
+ }catch(err){
+  console.log(err);
+ }
 })
 
 app.delete('/carts/:id', async (req, res) => {
+ try{
   const id = req.params.id;
   const query = { _id: new ObjectId(id) }
   const result = await cartCollection.deleteOne(query)
   res.send(result)
-
+ }catch(err){
+  console.log(err);
+ }
 })
 
 
 //payment intent 
 app.post('/create-payment-intent', async (req, res) => {
+ try{
   const { price } = req.body;
 
   const amount = parseInt(price * 100)
-  console.log(amount);
 
   const paymentIntent = await stripe.paymentIntents.create({
     amount: amount,
@@ -216,33 +284,35 @@ app.post('/create-payment-intent', async (req, res) => {
     payment_method_types: ['card']
 
   })
-
   res.send({
     clientSecret: paymentIntent.client_secret
   })
-
+ }catch(err){
+  console.log(err);
+ }
 })
 
 
 app.get('/payments', verifyToken, async (req, res) => {
+ try{
   const query = { email: req.query.email };
   if (req.params.email !== req.params.email) {
     return res.status(403).send({ message: 'forbidden access' })
   }
   const result = await paymentCollection.find(query).toArray()
   res.send(result)
+ }catch(err){
+  console.log(err);
+ }
 })
 
 
 // payment related api 
-app.post('/payments',verifyToken, async (req, res) => {
+app.post('/payments', verifyToken, async (req, res) => {
+ try{
   const payment = req.body;
-
-  console.log(payment);
   const paymentResult = await paymentCollection.insertOne(payment)
-
   // carefully delete eact item from the cart
-  console.log('payment ingor ', payment);
   const query = {
     _id: {
       $in: payment.cartIds.map(id => new ObjectId(id))
@@ -250,16 +320,17 @@ app.post('/payments',verifyToken, async (req, res) => {
   }
   const deleterResult = await cartCollection.deleteMany(query)
   res.send({ paymentResult, deleterResult })
-
+ }catch(err){
+  console.log(err);
+ }
 })
 
 //stats or analytics
-
 app.get('/admin-stats', verifyToken, verifyAdmin, async (req, res) => {
-  const users = await userCollection.estimatedDocumentCount();
+  try{
+    const users = await userCollection.estimatedDocumentCount();
   const menuItems = await menuCollection.estimatedDocumentCount();
   const orders = await paymentCollection.estimatedDocumentCount();
-
   // this is not the best way 
   // const payments = await paymentCollection.find().toArray()
   // const revenue = payments.reduce((total, payment)=>total + payment.price,0)
@@ -281,6 +352,9 @@ app.get('/admin-stats', verifyToken, verifyAdmin, async (req, res) => {
     orders,
     revenue
   })
+  }catch(err){
+    console.log(err);
+   }
 })
 
 // payment._id = payment._id.map(id => new ObjectId(id));
@@ -297,57 +371,60 @@ app.get('/admin-stats', verifyToken, verifyAdmin, async (req, res) => {
 
 
 // usering aggregate pipline 
-app.get('/order-stats', verifyToken, verifyAdmin,  async (req, res) => {
-  const result = await paymentCollection.aggregate([
+app.get('/order-stats', verifyToken, verifyAdmin, async (req, res) => {
+  try{
+    const result = await paymentCollection.aggregate([
 
-    { $unwind: '$menuItemIds' },
-    { "$project": { "menuItemId": { "$toObjectId": "$menuItemIds" } } },
-    {
-      $lookup: {
-        from: 'menu',
-        localField: 'menuItemId',
-        foreignField: '_id',
-        as: 'menuItems'
-      }
-    },
-
-    { $unwind: '$menuItems' },
-
-    {
-      $group: {
-        _id: '$menuItems.category',
-        quantity: { $sum: 1 },
-        revenue: { $sum: '$menuItems.price' }
-      }
-    },
-    {
-      $project: {
-        _id: 0,
-        category: '$_id',
-        quantity: '$quantity',
-        revenue: '$revenue'
-      }
-    }
-  ]).toArray();
-
-  res.send(result);
+      { $unwind: '$menuItemIds' },
+      { "$project": { "menuItemId": { "$toObjectId": "$menuItemIds" } } },
+      {
+        $lookup: {
+          from: 'menu',
+          localField: 'menuItemId',
+          foreignField: '_id',
+          as: 'menuItems'
+        }
+      },
   
+      { $unwind: '$menuItems' },
+  
+      {
+        $group: {
+          _id: '$menuItems.category',
+          quantity: { $sum: 1 },
+          revenue: { $sum: '$menuItems.price' }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          category: '$_id',
+          quantity: '$quantity',
+          revenue: '$revenue'
+        }
+      }
+    ]).toArray();
+  
+    res.send(result);
+  }catch(err){
+    console.log(err);
+   }
+
 })
-async function run() {
-  try {
-    // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
-    // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
-  } finally {
-    // Ensures that the client will close when you finish/error
-    // await client.close();
-  }
-}
-run().catch(console.dir);
 
 
+// async function run() {
+//   try {
+//     // Connect the client to the server	(optional starting in v4.7)
+//     await client.connect();
+//     // Send a ping to confirm a successful connection
+//     await client.db("admin").command({ ping: 1 });
+//   } finally {
+//     // Ensures that the client will close when you finish/error
+//     // await client.close();
+//   }
+// }
+// run().catch(console.dir);
 
 app.get('/', (req, res) => {
   res.send('bistro bosss server is running')
